@@ -106,12 +106,14 @@ I_a=[]; % clear elite archive
 
 if ledge == 1 % was in E^t, so guided solutions may enter E^t+1
     r = zeros(length(I_c),1);
+    k = zeros(length(I_c),1);
     % first see if any of the previously guided plus archive at t dominate 
     % the changed position
     for j=1:d
-        r =r + (X(I_c,j)<=X(chg,j));
+        r = r + (X(I_c,j)<=X(chg,j));
+        k = k + (X(I_c,j)<X(chg,j));
     end
-    z= sum(r==d);
+    z= sum(r==d & k>0);
     if (z==0) % chg not dominated
         I_a = [I_a chg]; % add to archive
         r = zeros(length(I_aa),1);
