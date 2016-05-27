@@ -37,7 +37,7 @@ function [Y,Y_dom,I_a] = single_link_guardian_iterative(Y,Y_dom,I_a,n,chg,type_v
 % Y_dom  = vector of single domination links 
 % dom_comps = number of domination comparisons used in this iterative
 %
-% copyright Jonathan Fieldsend, 2013,2014
+% copyright Jonathan Fieldsend, 2013, 2014, 2016
 
 if (chg>n)
    error('index of changed location cannot be higher than number of valid rows in Y'); 
@@ -125,7 +125,7 @@ if ledge == 1 % was in E^t, so guided solutions may enter E^t+1
         X_dom(I_aa(r==d)) = chg; % set chg as new guardian dominator for dominated elements of I_aa
     else % chg now dominated
         I_a = I_aa;
-        II = find(r==d);
+        II = find(r==d  & k>0);
         if type_vector(3) == 1
             X_dom(chg) = I_c(II(1));
         elseif type_vector(3)==2 % closest of guided by elite
