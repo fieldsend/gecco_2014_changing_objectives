@@ -37,7 +37,7 @@ function [Y,Y_dom,I_a] = single_link_guardian_iterative(Y,Y_dom,I_a,n,chg,type_v
 % Y_dom  = vector of single domination links 
 % dom_comps = number of domination comparisons used in this iterative
 %
-% copyright Jonathan Fieldsend, 2013,2014, 2016
+% copyright Jonathan Fieldsend, 2013, 2014, 2016
 
 if (chg>n)
    error('index of changed location cannot be higher than number of valid rows in Y'); 
