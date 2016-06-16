@@ -37,7 +37,7 @@ function [Y,Y_dom,I_a] = single_link_guardian_iterative(Y,Y_dom,I_a,n,chg,type_v
 % Y_dom  = vector of single domination links 
 % dom_comps = number of domination comparisons used in this iterative
 %
-% copyright Jonathan Fieldsend, 2013,2014
+% copyright Jonathan Fieldsend, 2013,2014, 2016
 
 if (chg>n)
    error('index of changed location cannot be higher than number of valid rows in Y'); 
@@ -49,12 +49,16 @@ end
 
 % update state
 if chg==0 % if no change has been made, then nth location is new
+    %fprintf('update new\n');
     [Y, Y_dom,I_a] = update_state_new_sample(Y, Y_dom, I_a, n, type_vector,d);
 else % otherwse update due to change in objective vector of 'chg'th solution
+    %fprintf('update change\n');
     [Y, Y_dom,I_a] = update_state_resample(Y, Y_dom, I_a, n, chg, type_vector,d);
 end
     
-    
+if isempty(I_a)
+    error('empty archive list generated');
+end    
 
 %------
 function [X, X_dom,I_a] = update_state_resample(X, X_dom, I_a, n, chg, type_vector,d)
@@ -72,7 +76,7 @@ end
 % call
 % As dynamically extending/contracting vectors stored for each element in
 % Matlab is not particularly efficient I've used find here, however I 
-% should release a Java version at some point maintaining reference/array 
+% should hopefully release a Java version at some point maintaining reference/array 
 % of references for each guarded/guarding solution. This will negate the 
 % need for a 'find' call
 
@@ -105,25 +109,23 @@ I_d = union(I_d, I_a,'stable');
 I_a=[]; % clear elite archive 
 
 if ledge == 1 % was in E^t, so guided solutions may enter E^t+1
-    r = zeros(length(I_c),1);
     % first see if any of the previously guided plus archive at t dominate 
     % the changed position
-    for j=1:d
-        r =r + (X(I_c,j)<=X(chg,j));
-    end
-    z= sum(r==d);
+    r = members_dominate(X,I_c,X(chg,:),d);
+    z = sum(r);
+    
     if (z==0) % chg not dominated
+        %fprintf('chg not dominated');
         I_a = [I_a chg]; % add to archive
-        r = zeros(length(I_aa),1);
-        for j=1:d
-            r =r + (X(I_aa,j)>=X(chg,j));
-        end
+        r = members_dominated(X,I_aa,X(chg,:),d);
+    
         % add back into archive non-dominated elements of I_aa
-        I_a = [I_a I_aa(r~=d)];
-        X_dom(I_aa(r==d)) = chg; % set chg as new guardian dominator for dominated elements of I_aa
+        I_a = [I_a I_aa(r==0)];
+        X_dom(I_aa(r)) = chg; % set chg as new guardian dominator for dominated elements of I_aa
     else % chg now dominated
+        %fprintf('chg now dominated %d', length(I_aa));
         I_a = I_aa;
-        II = find(r==d);
+        II = find(r);
         if type_vector(3) == 1
             X_dom(chg) = I_c(II(1));
         elseif type_vector(3)==2 % closest of guided by elite
@@ -148,18 +150,14 @@ if ledge == 1 % was in E^t, so guided solutions may enter E^t+1
     end
     % now check to reassign guarded elements
     for k=1:length(I_cc)
-        r = zeros(length(I_ci),1);
-        for j=1:d
-            r =r + (X(I_ci,j)<=X(I_cc(k),j));
-        end
-        z = sum(r==d);
-        zi=find(r==d);
-        if z==1 && zi<=length(I_cc)  % only doms itself
+        r = members_dominate(X,I_ci,X(I_cc(k),:),d);
+        z = sum(r);
+        %zi=find(r==d & r2>0);
+        if (z==0) %z==1 && zi<=length(I_cc)  % only doms itself
             I_a = [I_a I_cc(k)];
             X_dom(I_cc(k))=0; % mark not guided by anyone
         else
-            r(k)=0; % can't be dominator for istelf
-            II = find(r==d);
+            II = find(r);
                
             if type_vector(4)==1
                 if sum(X(chg,:)<= X(I_cc(k),:))~=d
@@ -187,34 +185,26 @@ if ledge == 1 % was in E^t, so guided solutions may enter E^t+1
         end
     end
 else % sampled point not from elite archive, so guarded solutions cannot end E^t+1
-    r = zeros(length(I_aa),1);
-    for j=1:d
-        r =r + (X(I_aa,j)<=X(chg,j));
-    end
-    z= sum(r==d);
+    r = members_dominate(X,I_aa,X(chg,:),d);
+    z= sum(r);
     if (z==0) % not dominated
         I_a = [I_a chg];
-        r = zeros(length(I_aa),1);
-        for j=1:d
-            r =r + (X(I_aa,j)>=X(chg,j));
-        end
+        r = members_dominated(X,I_aa,X(chg,:),d);
+        
         % add back into archive non-dominated elements of I_aa
-        I_a = [I_a I_aa(r~=d)];
-        X_dom(I_aa(r==d)) = chg;
+        I_a = [I_a I_aa(r==0)];
+        X_dom(I_aa(r)) = chg;
         X_dom(chg)=0; % mark as non-domed by no longer having guide
     else % now dominated
         I_a = I_aa;
-        II = find(r==d);
+        II = find(r);
         if type_vector(5) ==1 % select first dominating of E
             if sum(X(X_dom(chg),:)<=X(chg,:))~=d
                 X_dom(chg) = I_a(II(1));
             end
         else
-            r = zeros(length(I_d),1);
-            for j=1:d
-                r =r + (X(I_d,j)<=X(chg,j));
-            end
-            II = find(r==d);
+            r = members_dominate(X,I_d,X(chg,:),d);
+            II = find(r);
             
             if type_vector(5) == 2 % select first dominating of Y_chg U y* U E
                 X_dom(chg) = I_d(II(1));
@@ -247,18 +237,14 @@ else % sampled point not from elite archive, so guarded solutions cannot end E^t
     
     % now check to reassign guarded elements
     for k=1:length(I_cc)
-        r = zeros(length(I_cii),1);
-        for j=1:d
-            r =r + (X(I_cii,j)<=X(I_cc(k),j));
-        end
-        z = sum(r==d);
-        zi=find(r==d);
-        if z==1 && zi<=length(I_cc)  % only doms itself
+        r = members_dominate(X,I_cii,X(cc(k),:),d);
+        z = sum(r);
+        if (z==0)  
             I_a = [I_a I_cc(k)];
             X_dom(I_cc(k)) = 0; % mark as no longer having guide
         else
             r(k)=0; % can't be dominator for itself
-            II = find(r==d);
+            II = find(r);
             if type_vector(6)==1
                 if sum(X(chg,:)<= X(I_cc(k),:))~=d
                     X_dom(I_cc(k)) = old_dom;
@@ -358,5 +344,35 @@ else
         end
     end
 end
+
+%--------------------------------------------------------------------------
+function x = members_dominate(Y,sub_indices,y,d)
+
+% returns x, array containing which of the sub_indices elements of Y 
+% dominate y
+
+r = zeros(length(sub_indices),1);
+r2 = zeros(length(sub_indices),1);
+for j=1:d
+    r = r + (Y(sub_indices,j)<=y(j));
+    r2 = r2 + (Y(sub_indices,j)<y(j));
+end
+
+x = (r==d & r2>0);
+
+%--------------------------------------------------------------------------
+function x = members_dominated(Y,sub_indices,y,d)
+
+% returns x, array containing which of the sub_indices elements of Y 
+% dominate y
+
+r = zeros(length(sub_indices),1);
+r2 = zeros(length(sub_indices),1);
+for j=1:d
+    r = r + (Y(sub_indices,j)>=y(j));
+    r2 = r2 + (Y(sub_indices,j)>y(j));
+end
+
+x = (r==d & r2>0);
 
 
